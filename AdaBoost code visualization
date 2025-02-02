@@ -1,0 +1,87 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix
+
+# 1. Load dataset
+df = pd.read_csv("/content/data (3).csv")  # 🔹 Replace with actual file
+
+# 2. Preprocess the data
+# 🔹 Drop unnecessary columns like IDs (Modify column name accordingly)
+if 'id' in df.columns:
+    df = df.drop(columns=['id'])
+
+# 🔹 Encode categorical columns
+for col in df.select_dtypes(include=['object']).columns:
+    df[col] = LabelEncoder().fit_transform(df[col])
+
+# 🔹 Extract features and target
+X = df.iloc[:, :-1].values  # Features
+y = df.iloc[:, -1].values   # Target
+
+# 3. Train-test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# 4. Normalize features
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train.astype(float))  # Explicitly convert to float
+X_test = scaler.transform(X_test.astype(float))
+
+# 5. Train AdaBoost Model with Varying Estimators for Accuracy Visualization
+estimators = range(10, 101, 10)  # Testing with 10 to 100 estimators
+train_acc = []
+test_acc = []
+
+for n in estimators:
+    base_model = DecisionTreeClassifier(max_depth=1)  # Weak learner
+    adaboost_model = AdaBoostClassifier(base_model, n_estimators=n, learning_rate=1.0)
+    adaboost_model.fit(X_train, y_train)
+
+    train_acc.append(accuracy_score(y_train, adaboost_model.predict(X_train)))
+    test_acc.append(accuracy_score(y_test, adaboost_model.predict(X_test)))
+
+# 6. Final Model Training with 50 Estimators
+final_model = AdaBoostClassifier(DecisionTreeClassifier(max_depth=1), n_estimators=50, learning_rate=1.0)
+final_model.fit(X_train, y_train)
+
+# 7. Predict and Measure Accuracy
+y_pred = final_model.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Test Accuracy: {accuracy:.4f}")
+
+# 8. Accuracy Visualization (Training vs Testing)
+plt.figure(figsize=(7, 5))
+plt.plot(estimators, train_acc, marker='o', linestyle='-', color='blue', label="Train Accuracy")
+plt.plot(estimators, test_acc, marker='s', linestyle='--', color='red', label="Test Accuracy")
+plt.xlabel("Number of Estimators")
+plt.ylabel("Accuracy")
+plt.title("AdaBoost Training & Testing Accuracy")
+plt.legend()
+plt.grid()
+plt.show()
+
+# 9. Confusion Matrix Visualization
+conf_matrix = confusion_matrix(y_test, y_pred)
+
+plt.figure(figsize=(6, 5))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=['Healthy', 'Unhealthy'], yticklabels=['Healthy', 'Unhealthy'])
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.title('Confusion Matrix')
+plt.show()
+
+# 10. Bar Chart for Healthy vs. Unhealthy Predictions
+labels = ['Healthy', 'Unhealthy']
+unique, counts = np.unique(y_pred, return_counts=True)
+
+plt.figure(figsize=(6, 4))
+plt.bar(labels, counts, color=['green', 'red'])
+plt.xlabel('Class')
+plt.ylabel('Count')
+plt.title('Prediction Distribution (Healthy vs Unhealthy)')
+plt.show()
